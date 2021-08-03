@@ -23,25 +23,28 @@ const props = {
   },
 };
 
+let _files = null;
+
 function print(e) {
   const files = e.target.files;
+  console.log(this)
+  _files = files; 
+  // this.files = files;
   const test = files[0];
-  console.log(test);
-  test.text().then((res) => {
-    console.log(res);
-  });
-  console.log(test.stream());
+  // console.log(test);
+  // test.text().then((res) => {
+  //   console.log(res);
+  // });
 }
 
-const btnOnClick = (e) => {
+const onSubmit = (e) => {
+  console.log(_files)
+  const fd = new FormData();
+  fd.append('file', _files[0])
+  fd.append('userId', 'zhs');
   fetch(upload_url, {
     method: 'post',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: JSON.stringify({
-      name: 'zhs'
-    }),
+    body: fd,
   })
     .then((res) => res.json())
     .then((res) => {
@@ -52,13 +55,17 @@ const btnOnClick = (e) => {
 function App() {
   return (
     <div className="App">
-      <header className="App-header">
+      <div>
         <Upload {...props}>
           <Button icon={<UploadOutlined />}>Click to Upload</Button>
         </Upload>
-        <input type="file" id="" onChange={print} />
-        <Button onClick={btnOnClick}>click test</Button>
-      </header>
+      </div>
+      <div>
+        <input type="file" id="" onChange={print.bind(this)} />
+      </div>
+      <div>
+        <Button onClick={onSubmit}>上传</Button>
+      </div>
     </div>
   );
 }
