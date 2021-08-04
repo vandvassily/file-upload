@@ -36,3 +36,16 @@
     transform: rotate(360deg);
   }
 }
+
+.drag-area {
+  position: relative;
+  margin: 50px auto 0;
+  width: 400px;
+  height: 300px;
+  border: 1px dashed #333;
+  background-color: #eee;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

@@ -30,10 +30,14 @@
 5. 高并发情况
    1. 服务端多台服务器部署，采用nginx负载均衡，转到同一台服务器（session一致）
 
+### 其他小功能
+
+1. 拖拽上传
 
 ## 参考
 
 [nodejs+koa2实现文件上传大文件切片上传断点续传（服务器端）](https://blog.csdn.net/lixiaosenlin/article/details/114400710)
+[HTML5 File API 配合 Web Worker 计算大文件 SHA3 Hash 值](https://blog.izgq.net/archives/1260/)
 
 ## Getting Started
 

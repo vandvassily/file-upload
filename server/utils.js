@@ -1,3 +1,0 @@
-function writeFile(serverPath, file) {
-
-}

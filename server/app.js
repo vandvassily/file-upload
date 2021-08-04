@@ -24,18 +24,18 @@ app.use(
 );
 
 router.post('/upload', async (ctx, next) => {
-  console.log(ctx.request.files);
   const { file } = ctx.request.files;
-  await writeFile(file.path, path.join(__dirname, '../upload/1.jpeg'));
+  const { name } = file;
+  await writeFile(file.path, path.join(__dirname, '../upload/' + name));
 
-  ctx.body = JSON.stringify({
+  ctx.body = {
     code: 0,
     msg: 'upload success',
-  });
+  };
 });
 
 function writeFile(filePath, serverPath) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const readStream = fs.createReadStream(filePath);
     const writeStream = fs.createWriteStream(serverPath);
 
@@ -48,7 +48,12 @@ function writeFile(filePath, serverPath) {
     readStream.on('end', () => {
         writeStream.end('end', () => {
             console.log('再见');
+            resolve();
         })
+    });
+
+    readStream.on('error', (err) => {
+        reject(err);
     });
   });
 }

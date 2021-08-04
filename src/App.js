@@ -1,49 +1,63 @@
-import './App.css';
-import { Upload, message, Button } from 'antd';
-import { UploadOutlined } from '@ant-design/icons';
+import "./App.css";
+import { message, Button } from "antd";
+import { computeFileMd5 } from "./utils/compute_file_md5.js";
+import SparkMD5 from "spark-md5";
 
-const upload_url = 'http://localhost:4000/upload';
-
-const props = {
-  name: 'file',
-  action: upload_url,
-  headers: {
-    authorization: 'authorization-text',
-  },
-  onChange(info) {
-    console.log(info);
-    if (info.file.status !== 'uploading') {
-      console.log(info.file, info.fileList);
-    }
-    if (info.file.status === 'done') {
-      message.success(`${info.file.name} file uploaded successfully`);
-    } else if (info.file.status === 'error') {
-      message.error(`${info.file.name} file upload failed.`);
-    }
-  },
-};
+const upload_url = "http://localhost:4000/upload";
 
 let _files = null;
 
-function print(e) {
+function onChange(e) {
   const files = e.target.files;
-  console.log(this)
-  _files = files; 
-  // this.files = files;
-  const test = files[0];
-  // console.log(test);
-  // test.text().then((res) => {
-  //   console.log(res);
-  // });
+  _files = files;
+  const file = files[0];
+  computeFileMd5(SparkMD5, file).then((file) => {
+    message.info(`${file.name}的hash为: ${file.md5}`);
+    console.log(file.md5);
+  });
+}
+
+function onDrag() {
+  console.log("onDrag");
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log(e.dataTransfer.files);
+  [].forEach.call(e.dataTransfer.files, (file) => {
+    computeFileMd5(SparkMD5, file).then((file) => {
+      message.info(`${file.name}的hash为: ${file.md5}`);
+      console.log(file.md5);
+    });
+  });
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = "copy";
+}
+
+function onDragEnter(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log("onDragEnter");
+}
+
+function onDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log("onDragLeave");
 }
 
 const onSubmit = (e) => {
-  console.log(_files)
+  console.log(_files);
   const fd = new FormData();
-  fd.append('file', _files[0])
-  fd.append('userId', 'zhs');
+  fd.append("file", _files[0]);
+  fd.append("userId", "zhs");
   fetch(upload_url, {
-    method: 'post',
+    method: "post",
     body: fd,
   })
     .then((res) => res.json())
@@ -55,13 +69,23 @@ const onSubmit = (e) => {
 function App() {
   return (
     <div className="App">
-      <div>
-        <Upload {...props}>
-          <Button icon={<UploadOutlined />}>Click to Upload</Button>
-        </Upload>
-      </div>
-      <div>
-        <input type="file" id="" onChange={print.bind(this)} />
+      <div
+        className="drag-area"
+        onDrag={onDrag}
+        onDrop={onDrop}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+      >
+        <input
+          id="drag-upload"
+          type="file"
+          onChange={onChange}
+          style={{ display: "none" }}
+        />
+        <label className="label-center" htmlFor="drag-upload">
+          Click or drag file to this area to upload
+        </label>
       </div>
       <div>
         <Button onClick={onSubmit}>上传</Button>
