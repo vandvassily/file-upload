@@ -7,6 +7,8 @@ const path = require('path');
 const app = new Koa();
 const router = new Router();
 
+const PORT = process.env.PORT || 4000;
+
 // 解决跨域问题
 app.use(cors());
 app.use(
@@ -23,10 +25,22 @@ app.use(
   }),
 );
 
-router.post('/upload', async (ctx, next) => {
+// 单片上传
+router.post('/upload-slice', async (ctx, next) => {
   const { file } = ctx.request.files;
-  const { name } = file;
-  await writeFile(file.path, path.join(__dirname, '../upload/' + name));
+  const { userId, sliceName, sliceIndex } = ctx.request.body;
+  if(!userId) {
+    ctx.body = {
+      code: 400,
+      msg: "用户id不能为空",
+    };
+    return;
+  }
+  if (!fs.existsSync(path.join(__dirname, "../upload/", userId))) {
+    fs.mkdirSync(path.join(__dirname, "../upload/", userId));
+  }
+  const serverPath = path.join(__dirname, "../upload/", userId, sliceName);
+  await writeFile(file.path, serverPath);
 
   ctx.body = {
     code: 0,
@@ -34,6 +48,54 @@ router.post('/upload', async (ctx, next) => {
   };
 });
 
+// 合并请求
+router.post("/upload-combine", async (ctx, next) => {
+  const { userId, fileName, chunkCount } = ctx.request.body;
+  const filePath = path.join(__dirname, "../upload/", userId, fileName);
+
+  const writeStream = fs.createWriteStream(filePath);
+
+  
+  function append(i) {
+    
+  }
+  // if (!fs.existsSync(path.join(__dirname, "../upload/", userId))) {
+  //   fs.mkdirSync(path.join(__dirname, "../upload/", userId));
+  // }
+  // const serverPath = path.join(__dirname, "../upload/", userId, sliceName);
+  // await writeFile(file.path, serverPath);
+
+  // ctx.body = {
+  //   code: 0,
+  //   msg: "upload success",
+  // };
+});
+
+// 整个文件上传
+router.post('/upload', async (ctx, next) => {
+  const { file } = ctx.request.files;
+  const { name } = file;
+  const { userId } = ctx.request.body;
+  if(!userId) {
+    ctx.body = {
+      code: 400,
+      msg: "用户id不能为空",
+    };
+    return;
+  }
+  if (!fs.existsSync(path.join(__dirname, "../upload/", userId))) {
+    fs.mkdirSync(path.join(__dirname, "../upload/", userId));
+  }
+  const serverPath = path.join(__dirname, '../upload/', userId, name);
+  await writeFile(file.path, serverPath);
+
+  ctx.body = {
+    code: 0,
+    msg: 'upload success',
+  };
+});
+
+// 写入文件
 function writeFile(filePath, serverPath) {
   return new Promise((resolve, reject) => {
     const readStream = fs.createReadStream(filePath);
@@ -47,7 +109,7 @@ function writeFile(filePath, serverPath) {
 
     readStream.on('end', () => {
         writeStream.end('end', () => {
-            console.log('再见');
+            console.log('写入完成');
             resolve();
         })
     });
@@ -64,6 +126,6 @@ router.get('/', async (ctx) => {
 
 app.use(router.routes());
 
-app.listen(4000, () => {
-  console.log('Listening at 4000;');
+app.listen(PORT, () => {
+  console.log(`Listening at ${PORT};`);
 });
