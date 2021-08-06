@@ -5,8 +5,9 @@ import SparkMD5 from "spark-md5";
 
 const UPLOAD_URL = "http://localhost:4000/upload";
 const UPLOAD_SLICE_URL = "http://localhost:4000/upload-slice";
-const COMBINE_URL = "http://localhost:4000/upload-combine";
+const COMBINE_URL = "http://localhost:4000/upload-merge";
 const TEST_USER = "test";
+const SLICE_SIZE = 2 * 1024 * 1024;
 
 let _files = null;
 
@@ -59,9 +60,9 @@ function onDragLeave(e) {
 // 上传按钮点击事件
 function onSubmit(e) {
   console.log(_files);
-  uploadChunksByPromiseAll(_files[0], 200, TEST_USER).then((res) => {
+  uploadChunksByPromiseAll(_files[0], SLICE_SIZE, TEST_USER).then((res) => {
     message.success(res.msg);
-  });;
+  });
   // uploadFile(_files, TEST_USER);
 }
 
@@ -119,8 +120,7 @@ async function uploadChunksByPromiseAll(file, chunkSize, userId) {
     formData.append("file", chunk);
     formData.append("userId", userId);
     formData.append("sliceIndex", i);
-    formData.append("sliceName", prefixFileName + "_" + i);
-    console.log(chunk);
+    formData.append("prefixFileName", prefixFileName);
     chunks.push(uploadSlicedChunk(formData, userId));
   }
   await Promise.all(chunks);
@@ -143,14 +143,13 @@ function combineSlicedChunks(fileName, prefixFileName, chunkCount, userId) {
     headers: {
       "content-type": "application/json",
     },
-    body: {
+    body: JSON.stringify({
       fileName,
       prefixFileName,
       chunkCount,
       userId,
-    },
-  })
-    .then((res) => res.json())
+    }),
+  }).then((res) => res.json());
 }
 
 function App() {
