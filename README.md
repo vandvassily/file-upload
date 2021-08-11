@@ -38,7 +38,7 @@
 
 [nodejs+koa2实现文件上传大文件切片上传断点续传（服务器端）](https://blog.csdn.net/lixiaosenlin/article/details/114400710)
 [HTML5 File API 配合 Web Worker 计算大文件 SHA3 Hash 值](https://blog.izgq.net/archives/1260/)
-
+[webuploader](https://github.com/fex-team/webuploader)
 ## Getting Started
 
 Start the dev server,
