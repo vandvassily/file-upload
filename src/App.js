@@ -1,13 +1,17 @@
 import "./App.css";
 import { message, Button } from "antd";
-import { computeFileMd5 } from "./utils/compute_file_md5.js";
-import SparkMD5 from "spark-md5";
+import { computeFileMd5 } from "./utils/md5.js";
+import asyncPool from "tiny-async-pool"; // 异步控制
 
-const UPLOAD_URL = "http://localhost:4000/upload";
-const UPLOAD_SLICE_URL = "http://localhost:4000/upload-slice";
-const COMBINE_URL = "http://localhost:4000/upload-merge";
-const TEST_USER = "test";
-const SLICE_SIZE = 2 * 1024 * 1024;
+// 引入参数
+import {
+  SLICE_CHUNK_SIZE,
+  UPLOAD_SLICE_URL,
+  UPLOAD_MERGE_URL,
+} from "./constant";
+
+const TEST_USER = "vandvassily";
+const poolLimit = 5; // 并发数量
 
 let _files = null;
 
@@ -15,7 +19,7 @@ function onChange(e) {
   const files = e.target.files;
   _files = files;
   const file = files[0];
-  computeFileMd5(SparkMD5, file).then((file) => {
+  computeFileMd5(file).then((file) => {
     message.info(`${file.name}的hash为: ${file.md5}`);
     console.log(file.md5);
   });
@@ -31,7 +35,7 @@ function onDrop(e) {
   console.log(e.dataTransfer.files);
   _files = e.dataTransfer.files;
   [].forEach.call(e.dataTransfer.files, (file) => {
-    computeFileMd5(SparkMD5, file).then((file) => {
+    computeFileMd5(file).then((file) => {
       message.info(`${file.name}的hash为: ${file.md5}`);
       console.log(file.md5);
     });
@@ -58,59 +62,31 @@ function onDragLeave(e) {
 }
 
 // 上传按钮点击事件
-function onSubmit(e) {
-  console.log(_files);
-  uploadChunksByPromiseAll(_files[0], SLICE_SIZE, TEST_USER).then((res) => {
-    message.success(res.msg);
+async function onSubmit(e) {
+  const file = _files[0];
+  await computeFileMd5(file).then((file) => {
+    message.info(`${file.name}的hash为: ${file.md5}`);
   });
-  // uploadFile(_files, TEST_USER);
+  uploadChunksByAsyncPool(file, poolLimit, SLICE_CHUNK_SIZE, TEST_USER).then(
+    (res) => {
+      message.success(res.msg);
+    }
+  );
 }
 
 /**
- * 文件上传
- * @param {FileList} files 上传的文件对象列表
- * @param {Object} userId 上传用户的id
+ * 并发控制上传切片数量
+ * @param {File} file 文件对象
+ * @param {number} poolLimit 单次并发数量
+ * @param {number} chunkSize 切片大小
+ * @param {string} userId 用户ID
+ * @return {Promise}
  */
-function uploadFile(files, userId) {
-  if (!files || files.length === 0) {
-    message.error("请先选择文件");
-    return;
-  }
-
-  if (!userId) {
-    message.error("请输入userId");
-    return;
-  }
-  // 先实现一个简单的上传
-  const formData = new FormData();
-  // TODO: 改造为多文件上传
-  formData.append("file", _files[0]);
-  formData.append("userId", TEST_USER);
-  // for (let i = 0; i < files.length; i++) {
-  //   formData.append("file", files[i]);
-  // }
-  fetch(UPLOAD_URL, {
-    method: "POST",
-    body: formData,
-  })
-    .then((res) => res.json())
-    .then((res) => {
-      if (res.code === 0) {
-        message.success(res.msg);
-      } else {
-        message.error(res.msg);
-      }
-    })
-    .catch((err) => {
-      message.error(`${err}`);
-    });
-}
-
-async function uploadChunksByPromiseAll(file, chunkSize, userId) {
+async function uploadChunksByAsyncPool(file, poolLimit, chunkSize, userId) {
   const fileSize = file.size;
   const chunkCount = Math.ceil(fileSize / chunkSize);
   const chunks = [];
-  const prefixFileName = file.name.split(".")[0];
+  const hashName = file.md5;
 
   for (let i = 0; i < chunkCount; i++) {
     const start = i * chunkSize;
@@ -120,32 +96,44 @@ async function uploadChunksByPromiseAll(file, chunkSize, userId) {
     formData.append("file", chunk);
     formData.append("userId", userId);
     formData.append("sliceIndex", i);
-    formData.append("prefixFileName", prefixFileName);
-    chunks.push(uploadSlicedChunk(formData, userId));
+    formData.append("hashName", hashName);
+    chunks.push(formData);
   }
-  await Promise.all(chunks);
+  await asyncPool(poolLimit, chunks, uploadChunk);
 
-  // 文件名字为带后缀的
-  return combineSlicedChunks(file.name, prefixFileName, chunkCount, userId);
+  // 调用合并接口
+  return mergeChunks(file.name, hashName, chunkCount, userId);
 }
 
-function uploadSlicedChunk(formData, userId) {
+/**
+ * 上传单一切片
+ * @param {FormData} formData 数据
+ * @return {Promise}
+ */
+function uploadChunk(formData) {
   return fetch(UPLOAD_SLICE_URL, {
     method: "POST",
     body: formData,
   }).then((res) => res.json());
 }
 
-// send a combine request
-function combineSlicedChunks(fileName, prefixFileName, chunkCount, userId) {
-  return fetch(COMBINE_URL, {
+/**
+ * 合并接口
+ * @param {string} fileName 文件名称
+ * @param {string} hashName hash
+ * @param {number} chunkCount 切片数量
+ * @param {string} userId 用户ID
+ * @return {Promise}
+ */
+function mergeChunks(fileName, hashName, chunkCount, userId) {
+  return fetch(UPLOAD_MERGE_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
     body: JSON.stringify({
       fileName,
-      prefixFileName,
+      hashName,
       chunkCount,
       userId,
     }),

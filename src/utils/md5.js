@@ -1,4 +1,6 @@
-const chunkSize = 2 * 1024 * 1024; // 切片大小
+import { HASH_CHUNK_SIZE } from "../constant.js";
+import SparkMD5 from "spark-md5";
+
 const blobSlice =
   File.prototype.slice || File.prototype.mozSlice || File.prototype.webkitSlice;
 
@@ -15,7 +17,7 @@ function loadNext(spark, file, currentChunk, resolve, reject) {
   fileReader.onload = function (event) {
     const data = event.target.result;
     spark.append(data);
-    file.chunkCount = Math.ceil(file.size / chunkSize);
+    file.chunkCount = Math.ceil(file.size / HASH_CHUNK_SIZE);
     if (currentChunk < file.chunkCount - 1) {
       currentChunk++;
       loadNext(spark, file, currentChunk, resolve, reject);
@@ -29,8 +31,9 @@ function loadNext(spark, file, currentChunk, resolve, reject) {
     reject(event.target.error);
   };
 
-  const start = currentChunk * chunkSize;
-  const end = start + chunkSize >= file.size ? file.size : start + chunkSize;
+  const start = currentChunk * HASH_CHUNK_SIZE;
+  const end =
+    start + HASH_CHUNK_SIZE >= file.size ? file.size : start + HASH_CHUNK_SIZE;
 
   // 使用blob.slice方法，可以指定从哪个位置开始读取
   fileReader.readAsArrayBuffer(blobSlice.call(file, start, end));
@@ -39,11 +42,10 @@ function loadNext(spark, file, currentChunk, resolve, reject) {
 /**
  * 加载文件并计算其md5
  * @export
- * @param {Object} SparkMD5 第三方加密库
  * @param {Object} file 上传文件对象
  * @return {Promise<string>}
  */
-export function computeFileMd5(SparkMD5, file) {
+export function computeFileMd5(file) {
   const currentChunk = 0;
   const spark = new SparkMD5.ArrayBuffer();
 

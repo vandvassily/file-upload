@@ -15,14 +15,14 @@ app.use(cors());
 app.use(
   koaBody({
     multipart: true,
-    // formidable: {
-    // uploadDir: path.join(__dirname, '../upload/'),
-    // maxFieldsSize: 200 * 1024 * 1024,
-    // keepExtensions: true,
-    // onFileBegin: (name) => {
-    //     console.log(name)
-    // }
-    // }
+    formidable: {
+      uploadDir: path.join(__dirname, "../upload-temp/"), // 前端文件默认缓存存储的位置
+      // maxFieldsSize: 200 * 1024 * 1024,
+      // keepExtensions: true,
+      // onFileBegin: (name) => {
+      //     console.log(name)
+      // }
+    },
   })
 );
 
@@ -39,7 +39,7 @@ router.post("/upload-slice", async (ctx, next) => {
   }
   const dirPath = path.join(UPLOAD_PATH, userId, prefixFileName);
   if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath);
+    fs.mkdirSync(dirPath, { recursive: true });
   }
   const serverPath = path.join(dirPath, sliceIndex);
   await writeFile(file.path, serverPath);
@@ -96,13 +96,13 @@ function mergeFile(dirPath, filePath, chunkCount) {
             res();
           }
 
-          const chunkPath = dirPath + '/' + currentChunkIndex;
+          const chunkPath = dirPath + "/" + currentChunkIndex;
 
           fs.readFile(chunkPath, (err, data) => {
             if (err) return rej(err);
 
             fs.appendFile(filePath, data, () => {
-              console.log(`当前合并顺序:${currentChunkIndex}`)
+              console.log(`当前合并顺序:${currentChunkIndex}`);
               fs.unlink(chunkPath, () => {
                 // 递归合并
                 res(append(currentChunkIndex + 1));
