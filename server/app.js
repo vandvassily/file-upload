@@ -10,13 +10,19 @@ const router = new Router();
 const PORT = process.env.PORT || 4000;
 const UPLOAD_PATH = path.join(__dirname, "../upload");
 
+// 创建临时文件存放目录
+const tempUploadDir = path.join(__dirname, "../upload-temp/");
+if (!fs.existsSync(tempUploadDir)) {
+  fs.mkdirSync(tempUploadDir);
+}
+
 // 解决跨域问题
 app.use(cors());
 app.use(
   koaBody({
     multipart: true,
     formidable: {
-      uploadDir: path.join(__dirname, "../upload-temp/"), // 前端文件默认缓存存储的位置
+      uploadDir: tempUploadDir, // 前端文件默认缓存存储的位置
       // maxFieldsSize: 200 * 1024 * 1024,
       // keepExtensions: true,
       // onFileBegin: (name) => {
@@ -29,7 +35,7 @@ app.use(
 // 单片上传
 router.post("/upload-slice", async (ctx, next) => {
   const { file } = ctx.request.files;
-  const { userId, prefixFileName, sliceIndex } = ctx.request.body;
+  const { userId, hashName, sliceIndex } = ctx.request.body;
   if (!userId) {
     ctx.body = {
       code: 400,
@@ -37,7 +43,7 @@ router.post("/upload-slice", async (ctx, next) => {
     };
     return;
   }
-  const dirPath = path.join(UPLOAD_PATH, userId, prefixFileName);
+  const dirPath = path.join(UPLOAD_PATH, userId, hashName);
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
@@ -52,9 +58,9 @@ router.post("/upload-slice", async (ctx, next) => {
 
 // 合并请求
 router.post("/upload-merge", async (ctx, next) => {
-  const { userId, fileName, prefixFileName, chunkCount } = ctx.request.body;
+  const { userId, fileName, hashName, chunkCount } = ctx.request.body;
   const filePath = path.join(UPLOAD_PATH, userId, fileName);
-  const dirPath = path.join(UPLOAD_PATH, userId, prefixFileName);
+  const dirPath = path.join(UPLOAD_PATH, userId, hashName);
 
   await mergeFile(dirPath, filePath, chunkCount)
     .then(() => {
