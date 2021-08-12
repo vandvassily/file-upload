@@ -1,14 +1,17 @@
-const Koa = require("koa");
 const fs = require("fs");
+const path = require("path");
+const Koa = require("koa");
 const Router = require("koa-router");
 const cors = require("koa-cors");
 const koaBody = require("koa-body");
-const path = require("path");
-const app = new Koa();
-const router = new Router();
+const log4js = require("./logger.js");
+const fileHandle = require('./file.js');
 
 const PORT = process.env.PORT || 4000;
 const UPLOAD_PATH = path.join(__dirname, "../upload");
+
+const app = new Koa();
+const router = new Router();
 
 // 创建临时文件存放目录
 const tempUploadDir = path.join(__dirname, "../upload-temp/");
@@ -32,6 +35,26 @@ app.use(
   })
 );
 
+// 获取已上传的切片编号
+router.post("/get-uploaded-chunks", async (ctx, next) => {
+  const { userId, hashName } = ctx.request.body;
+  const dirPath = path.join(UPLOAD_PATH, userId, hashName);
+  if (!fs.existsSync(dirPath)) {
+    ctx.body = {
+      code: 0,
+      data: [],
+      msg: "未上传",
+    };
+  } else {
+    const arr = fs.readdirSync(dirPath);
+    ctx.body = {
+      code: 0,
+      data: arr,
+      msg: "获取成功",
+    };
+  }
+});
+
 // 单片上传
 router.post("/upload-slice", async (ctx, next) => {
   const { file } = ctx.request.files;
@@ -48,7 +71,12 @@ router.post("/upload-slice", async (ctx, next) => {
     fs.mkdirSync(dirPath, { recursive: true });
   }
   const serverPath = path.join(dirPath, sliceIndex);
-  await writeFile(file.path, serverPath);
+  await fileHandle.writeFile(file.path, serverPath).catch((err) => {
+    fs.unlink(serverPath, () => {
+      // 递归合并
+      console.log(`已删除未完成的切片: ${serverPath}`);
+    });
+  });
 
   ctx.body = {
     code: 0,
@@ -62,7 +90,7 @@ router.post("/upload-merge", async (ctx, next) => {
   const filePath = path.join(UPLOAD_PATH, userId, fileName);
   const dirPath = path.join(UPLOAD_PATH, userId, hashName);
 
-  await mergeFile(dirPath, filePath, chunkCount)
+  await fileHandle.mergeFile(dirPath, filePath, chunkCount)
     .then(() => {
       ctx.body = {
         code: 0,
@@ -76,55 +104,6 @@ router.post("/upload-merge", async (ctx, next) => {
       };
     });
 });
-
-/**
- * 切片文件合并
- */
-function mergeFile(dirPath, filePath, chunkCount) {
-  return new Promise((resolve, reject) => {
-    fs.readdir(dirPath, (err, files) => {
-      if (err) {
-        reject(err);
-      }
-
-      if (files.length !== chunkCount) {
-        reject("上传失败");
-      }
-
-      const writeStream = fs.createWriteStream(filePath);
-
-      function append(currentChunkIndex) {
-        return new Promise((res, rej) => {
-          if (currentChunkIndex === chunkCount) {
-            fs.rmdir(dirPath, (err) => {
-              console.log(err, "rmdir");
-            });
-            res();
-          }
-
-          const chunkPath = dirPath + "/" + currentChunkIndex;
-
-          fs.readFile(chunkPath, (err, data) => {
-            if (err) return rej(err);
-
-            fs.appendFile(filePath, data, () => {
-              console.log(`当前合并顺序:${currentChunkIndex}`);
-              fs.unlink(chunkPath, () => {
-                // 递归合并
-                res(append(currentChunkIndex + 1));
-              });
-            });
-          });
-        });
-      }
-
-      append(0).then(() => {
-        writeStream.close();
-        resolve();
-      });
-    });
-  });
-}
 
 // 整个文件上传
 router.post("/upload", async (ctx, next) => {
@@ -142,7 +121,7 @@ router.post("/upload", async (ctx, next) => {
     fs.mkdirSync(path.join(UPLOAD_PATH, userId));
   }
   const serverPath = path.join(UPLOAD_PATH, userId, name);
-  await writeFile(file.path, serverPath);
+  await fileHandle.writeFile(file.path, serverPath);
 
   ctx.body = {
     code: 0,
@@ -150,36 +129,26 @@ router.post("/upload", async (ctx, next) => {
   };
 });
 
-// 写入文件
-function writeFile(filePath, serverPath) {
-  return new Promise((resolve, reject) => {
-    const readStream = fs.createReadStream(filePath);
-    const writeStream = fs.createWriteStream(serverPath);
-
-    readStream.on("data", (chunkData) => {
-      writeStream.write(chunkData, () => {
-        console.log(`开始写入`);
-      });
-    });
-
-    readStream.on("end", () => {
-      writeStream.end("", () => {
-        console.log("写入完成");
-        resolve();
-      });
-    });
-
-    readStream.on("error", (err) => {
-      reject(err);
-    });
-  });
-}
-
 router.get("/", async (ctx) => {
   ctx.body = "Hello World!";
 });
 
 app.use(router.routes());
+
+// 处理异常情况，记录异常日志
+app.on("error", (err, ctx) => {
+  log4js.logError(err);
+});
+
+//监听未捕获的异常
+process.on("uncaughtException", function (err) {
+  console.log(`未捕获的异常: ${JSON.stringify(err)}`);
+});
+
+//监听Promise没有被捕获的失败函数
+process.on("unhandledRejection", function (err) {
+  console.log(`未捕获的promise异常: ${JSON.stringify(err)}`);
+});
 
 app.listen(PORT, () => {
   console.log(`Listening at ${PORT};`);

@@ -8,9 +8,10 @@ import {
   SLICE_CHUNK_SIZE,
   UPLOAD_SLICE_URL,
   UPLOAD_MERGE_URL,
+  GET_UPLOADED_CHUNKS_URL,
 } from "./constant";
 
-const TEST_USER = "vandvassily";
+const userId = "vandvassily";
 const poolLimit = 5; // 并发数量
 
 let _files = null;
@@ -64,14 +65,39 @@ function onDragLeave(e) {
 // 上传按钮点击事件
 async function onSubmit(e) {
   const file = _files[0];
-  await computeFileMd5(file).then((file) => {
-    message.info(`${file.name}的hash为: ${file.md5}`);
-  });
-  uploadChunksByAsyncPool(file, poolLimit, SLICE_CHUNK_SIZE, TEST_USER).then(
+  if (!file.md5) {
+    await computeFileMd5(file).then((file) => {
+      message.info(`${file.name}的hash为: ${file.md5}`);
+    });
+  }
+  const uploadedChunks = await getUploadedChunks(userId, file.md5).then(
     (res) => {
-      message.success(res.msg);
+      return res.data;
     }
   );
+  uploadChunksByAsyncPool(
+    file,
+    poolLimit,
+    SLICE_CHUNK_SIZE,
+    uploadedChunks,
+    userId
+  ).then((res) => {
+    message.success(res.msg);
+  });
+}
+
+// 获取已上传的切片数组
+function getUploadedChunks(userId, hashName) {
+  return fetch(GET_UPLOADED_CHUNKS_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      userId,
+      hashName,
+    }),
+  }).then((res) => res.json());
 }
 
 /**
@@ -79,16 +105,27 @@ async function onSubmit(e) {
  * @param {File} file 文件对象
  * @param {number} poolLimit 单次并发数量
  * @param {number} chunkSize 切片大小
+ * @param {Array} uploadedChunks 已上传的分片编号  例如 ['1', '2', '4']
  * @param {string} userId 用户ID
  * @return {Promise}
  */
-async function uploadChunksByAsyncPool(file, poolLimit, chunkSize, userId) {
+async function uploadChunksByAsyncPool(
+  file,
+  poolLimit,
+  chunkSize,
+  uploadedChunks = [],
+  userId
+) {
   const fileSize = file.size;
   const chunkCount = Math.ceil(fileSize / chunkSize);
   const chunks = [];
   const hashName = file.md5;
 
   for (let i = 0; i < chunkCount; i++) {
+    // 如果切片存在，则跳过
+    if (uploadedChunks.length > 0 && uploadedChunks.includes(i + "")) {
+      continue;
+    }
     const start = i * chunkSize;
     const end = start + chunkSize;
     const chunk = file.slice(start, end);

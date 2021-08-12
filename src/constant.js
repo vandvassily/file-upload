@@ -11,3 +11,5 @@ const HOST = `http://${window.location.hostname}:4000/`;
 export const UPLOAD_SLICE_URL = HOST + "upload-slice";
 // 合并接口
 export const UPLOAD_MERGE_URL = HOST + "upload-merge";
+// 合并接口
+export const GET_UPLOADED_CHUNKS_URL = HOST + "get-uploaded-chunks";
