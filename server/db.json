@@ -1,4 +1,11 @@
 {
     "name": "已上传图片库",
-    "map": {}
+    "map": {
+        "aabbcc": [
+            {
+                "userId": "vandvassily",
+                "filePath": "upload/vandvassily/logo.jpg"
+            }
+        ]
+    }
 }
