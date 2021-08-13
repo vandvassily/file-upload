@@ -9,9 +9,11 @@ import {
   UPLOAD_SLICE_URL,
   UPLOAD_MERGE_URL,
   GET_UPLOADED_CHUNKS_URL,
+  CHECK_HASH_URL,
+  COPY_FILE_URL,
 } from "./constant";
 
-const userId = "vandvassily";
+const userId = "testUser";
 const poolLimit = 5; // 并发数量
 
 let _files = null;
@@ -70,6 +72,14 @@ async function onSubmit(e) {
       message.info(`${file.name}的hash为: ${file.md5}`);
     });
   }
+  const res = await checkHash(file.md5)
+  if(res.data) {
+    await copyFile(file.md5, userId, file.name).then(res => {
+      message.info(`文件: ${file.name} 秒传成功`);
+    })
+
+    return;
+  }
   const uploadedChunks = await getUploadedChunks(userId, file.md5).then(
     (res) => {
       return res.data;
@@ -96,6 +106,33 @@ function getUploadedChunks(userId, hashName) {
     body: JSON.stringify({
       userId,
       hashName,
+    }),
+  }).then((res) => res.json());
+}
+
+// 检查文件hash
+function checkHash(hashName) {
+  return fetch(CHECK_HASH_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      hashName,
+    }),
+  }).then((res) => res.json());
+}
+// 复制相同文件---秒传
+function copyFile(hashName, userId, fileName) {
+  return fetch(COPY_FILE_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      hashName,
+      userId,
+      fileName,
     }),
   }).then((res) => res.json());
 }

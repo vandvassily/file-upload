@@ -4,21 +4,26 @@ const Koa = require("koa");
 const Router = require("koa-router");
 const cors = require("koa-cors");
 const koaBody = require("koa-body");
+const serve = require('koa-static');
 const log4js = require("./logger.js");
 const fileHandle = require('./file.js');
+const { getSameFileDir, insertToDB } = require("./db.js");
 
 const PORT = process.env.PORT || 4000;
 const UPLOAD_PATH = path.join(__dirname, "../upload");
-
-const app = new Koa();
-const router = new Router();
-
 // 创建临时文件存放目录
 const tempUploadDir = path.join(__dirname, "../upload-temp/");
 if (!fs.existsSync(tempUploadDir)) {
   fs.mkdirSync(tempUploadDir);
 }
 
+const app = new Koa();
+const router = new Router();
+
+// 静态化上传目录，通过url可以访问
+app.use(serve('./upload', {
+  maxage: 60 * 1000,
+}));
 // 解决跨域问题
 app.use(cors());
 app.use(
@@ -34,6 +39,48 @@ app.use(
     },
   })
 );
+
+// 检查服务端数据库是否用相同hash的文件
+router.post("/check-hash", async (ctx, next) => {
+  const { hashName } = ctx.request.body;
+  const dirPath = getSameFileDir(hashName);
+
+  ctx.body = {
+    code: 0,
+    data: !!dirPath,
+    msg: dirPath ? '拥有相同文件' : "未有相同文件",
+  };
+})
+
+// 文件秒传
+router.post("/copy-file", async (ctx, next) => {
+  const { userId, hashName, fileName } = ctx.request.body;
+  const dirPath = getSameFileDir(hashName);
+
+  if (!dirPath) {
+    ctx.body = {
+      code: 500,
+      msg: "服务器错误",
+    };
+    return;
+  }
+
+  const targetDir = path.join(UPLOAD_PATH, userId)
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const sourceFilePath = path.join(UPLOAD_PATH, dirPath);
+  const targetFilePath = path.join(UPLOAD_PATH, userId, fileName);
+  await fileHandle.writeFile(sourceFilePath, targetFilePath);
+
+  const resUrl = userId + '/' + fileName;
+  ctx.body = {
+    code: 0,
+    data: resUrl,
+    msg: "秒传成功",
+  };
+});
 
 // 获取已上传的切片编号
 router.post("/get-uploaded-chunks", async (ctx, next) => {
@@ -70,11 +117,10 @@ router.post("/upload-slice", async (ctx, next) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
-  const serverPath = path.join(dirPath, sliceIndex);
-  await fileHandle.writeFile(file.path, serverPath).catch((err) => {
-    fs.unlink(serverPath, () => {
-      // 递归合并
-      console.log(`已删除未完成的切片: ${serverPath}`);
+  const targetFilePath = path.join(dirPath, sliceIndex);
+  await fileHandle.writeFile(file.path, targetFilePath).catch((err) => {
+    fs.unlink(targetFilePath, () => {
+      console.log(`已删除未完成的切片: ${targetFilePath}`);
     });
   });
 
@@ -92,14 +138,21 @@ router.post("/upload-merge", async (ctx, next) => {
 
   await fileHandle.mergeFile(dirPath, filePath, chunkCount)
     .then(() => {
+      const resUrl = userId + '/' + fileName;
+      // 数据库json插入数据
+      insertToDB(hashName, {
+        userId,
+        filePath: resUrl,
+      });
       ctx.body = {
         code: 0,
+        data: resUrl,
         msg: "upload success",
       };
     })
     .catch((err) => {
       ctx.body = {
-        code: 0,
+        code: 500,
         msg: err,
       };
     });
@@ -120,8 +173,8 @@ router.post("/upload", async (ctx, next) => {
   if (!fs.existsSync(path.join(UPLOAD_PATH, userId))) {
     fs.mkdirSync(path.join(UPLOAD_PATH, userId));
   }
-  const serverPath = path.join(UPLOAD_PATH, userId, name);
-  await fileHandle.writeFile(file.path, serverPath);
+  const targetFilePath = path.join(UPLOAD_PATH, userId, name);
+  await fileHandle.writeFile(file.path, targetFilePath);
 
   ctx.body = {
     code: 0,

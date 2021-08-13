@@ -1,17 +1,21 @@
 const fs = require('fs');
 const path = require('path');
-const { writeFile } = require('./file');
 
-const hashName = 'aabbcc';
 const dbPath = path.join(__dirname, 'db.json');
 
 function readDB() {
   return JSON.parse(fs.readFileSync(dbPath));
 }
 
-function isFileMatched(hashName) {
+/**
+ * 获取拥有相同hash的文件相对地址
+ * @param {string} hashName 文件hash指纹
+ * @return {string} dirPath 文件存储的相对路径
+ */
+function getSameFileDir(hashName) {
   const db = readDB().map;
-  return !!db[hashName];
+  
+  return !!db[hashName] ? db[hashName].filePath : '';
 }
 
 function insertToDB(hashName, file) {
@@ -25,25 +29,7 @@ function insertToDB(hashName, file) {
   fs.writeFileSync(dbPath, JSON.stringify(db));
 }
 
-// TODO: 待完成
-async function copyFile(hashName, serverPath) {
-  // 1. 读取数据库
-  // 2. 复制第一条数据
-  const db = readDB().map;
-  const fileList = db[hashName];
-
-  const file = fileList[0];
-  await writeFile(file.filePath, serverPath);
-}
-
-
-console.log(isFileMatched(hashName));
-
-if(isFileMatched(hashName)) {
-  const userId = 'vassily';
-  const dirPath = path.join(__dirname,'../upload', userId);
-  if(!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath)
-  }
-  copyFile(hashName, path.join(dirPath, 'logo.jpg'))
-}
+module.exports = {
+  getSameFileDir,
+  insertToDB,
+};

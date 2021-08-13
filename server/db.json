@@ -1,11 +1,1 @@
-{
-    "name": "已上传图片库",
-    "map": {
-        "aabbcc": [
-            {
-                "userId": "vandvassily",
-                "filePath": "upload/vandvassily/logo.jpg"
-            }
-        ]
-    }
-}
+{"name":"已上传图片库","map":{"cc5f08741672d01b693f1d8bdbc164d9":{"filePath":"vandvassily/logo.png","userId":"vandvassily"},"66e1bc485b97ca993195c57d601ecc7a":{"filePath":"vandvassily/wxnh.mp4","userId":"vandvassily"}}}
