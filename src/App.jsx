@@ -1,5 +1,6 @@
+import React, { useState, useEffect } from 'react'
 import "./App.css";
-import { message, Button } from "antd";
+import { message, Button, Progress } from "antd";
 import { computeFileMd5 } from "./utils/md5.js";
 import asyncPool from "tiny-async-pool"; // 异步控制
 
@@ -215,6 +216,8 @@ function mergeChunks(fileName, hashName, chunkCount, userId) {
 }
 
 function App() {
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   return (
     <div className="App">
       <div
@@ -237,6 +240,9 @@ function App() {
       </div>
       <div>
         <Button onClick={onSubmit}>上传</Button>
+      </div>
+      <div>
+        <Progress width={uploadProgress} />
       </div>
     </div>
   );
