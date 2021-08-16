@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from "react";
 import "./App.css";
 import { message, Button, Progress } from "antd";
 import { computeFileMd5 } from "./utils/md5.js";
@@ -16,18 +16,6 @@ import {
 
 const userId = "testUser";
 const poolLimit = 5; // 并发数量
-
-let _files = null;
-
-function onChange(e) {
-  const files = e.target.files;
-  _files = files;
-  const file = files[0];
-  computeFileMd5(file).then((file) => {
-    message.info(`${file.name}的hash为: ${file.md5}`);
-    console.log(file.md5);
-  });
-}
 
 function onDrag() {
   console.log("onDrag");
@@ -63,38 +51,6 @@ function onDragLeave(e) {
   e.preventDefault();
   e.stopPropagation();
   console.log("onDragLeave");
-}
-
-// 上传按钮点击事件
-async function onSubmit(e) {
-  const file = _files[0];
-  if (!file.md5) {
-    await computeFileMd5(file).then((file) => {
-      message.info(`${file.name}的hash为: ${file.md5}`);
-    });
-  }
-  const res = await checkHash(file.md5)
-  if(res.data) {
-    await copyFile(file.md5, userId, file.name).then(res => {
-      message.info(`文件: ${file.name} 秒传成功`);
-    })
-
-    return;
-  }
-  const uploadedChunks = await getUploadedChunks(userId, file.md5).then(
-    (res) => {
-      return res.data;
-    }
-  );
-  uploadChunksByAsyncPool(
-    file,
-    poolLimit,
-    SLICE_CHUNK_SIZE,
-    uploadedChunks,
-    userId
-  ).then((res) => {
-    message.success(res.msg);
-  });
 }
 
 // 获取已上传的切片数组
@@ -216,7 +172,60 @@ function mergeChunks(fileName, hashName, chunkCount, userId) {
 }
 
 function App() {
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [file, setFile] = useState(null);
+  const [chunks, setChunks] = useState([]);
+  // const [total, setTotal] = useState(Number.MAX_SAFE_INTEGER);
+  const [total, setTotal] = useState(10);
+
+  useEffect(() => {
+    // setProgress(parseInt(chunks.length / total));
+    console.log("test");
+    setProgress(parseInt((3 * 100) / total));
+  }, [chunks, total]);
+
+  const handleUploadClick = useCallback(async () => {
+    if (!file.md5) {
+      await computeFileMd5(file).then((file) => {
+        message.info(`${file.name}的hash为: ${file.md5}`);
+      });
+    }
+
+    const res = await checkHash(file.md5);
+    if (res.data) {
+      await copyFile(file.md5, userId, file.name).then((res) => {
+        message.info(`文件: ${file.name} 秒传成功`);
+      });
+
+      return;
+    }
+
+    const uploadedChunks = await getUploadedChunks(userId, file.md5).then(
+      (res) => {
+        return res.data;
+      }
+    );
+
+    setChunks(uploadedChunks);
+    return await uploadChunksByAsyncPool(
+      file,
+      poolLimit,
+      SLICE_CHUNK_SIZE,
+      uploadedChunks,
+      userId
+    );
+  }, [file]);
+
+  const onChange = useCallback((e) => {
+    const files = e.target.files;
+    const file = files[0];
+    setFile(file);
+
+    computeFileMd5(file).then((file) => {
+      message.info(`${file.name}的hash为: ${file.md5}`);
+      console.log(file.md5);
+    });
+  }, []);
 
   return (
     <div className="App">
@@ -239,10 +248,10 @@ function App() {
         </label>
       </div>
       <div>
-        <Button onClick={onSubmit}>上传</Button>
+        <Button onClick={handleUploadClick}>上传</Button>
       </div>
       <div>
-        <Progress width={uploadProgress} />
+        <Progress percent={progress} />
       </div>
     </div>
   );
