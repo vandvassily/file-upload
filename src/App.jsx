@@ -42,13 +42,12 @@ function App() {
   };
 
   useEffect(() => {
-    console.log(123123);
-    setProgress(Number((chunks * 100) / total));
+    setProgress(Number((chunks * 100) / total).toFixed(2));
   }, [chunks, total]);
 
   const handleUploadClick = useCallback(async () => {
     if (file === null) return;
-    if (file.md5) {
+    if (!file.md5) {
       await computeFileMd5(file).then((file) => {
         message.info(`${file.name}的hash为: ${file.md5}`);
       });
@@ -140,15 +139,15 @@ function App() {
     commonComputeMD5(file);
   };
 
-  function commonComputeMD5(file) {
+  async function commonComputeMD5(file) {
+    await computeFileMd5(file).then((file) => {
+      message.info(`${file.name}的hash为: ${file.md5}`);
+      console.log(file.md5);
+    });
     setFile(file);
     setProgress(0);
     setChunks(0);
     setTotal(Number.MAX_SAFE_INTEGER);
-    computeFileMd5(file).then((file) => {
-      message.info(`${file.name}的hash为: ${file.md5}`);
-      console.log(file.md5);
-    });
   }
 
   return (
@@ -179,6 +178,14 @@ function App() {
               Click or drag file to this area to upload
             </label>
           </div>
+        </Form.Item>
+
+        <Form.Item label='文件hash'>
+          <span className='ant-form-text'>{file && file.md5}</span>
+        </Form.Item>
+
+        <Form.Item label='文件名称'>
+          <span className='ant-form-text'>{file && file.name}</span>
         </Form.Item>
 
         <Form.Item

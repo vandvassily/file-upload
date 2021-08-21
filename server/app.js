@@ -12,7 +12,7 @@ const { getSameFileDir, insertToDB } = require("./db.js");
 const PORT = process.env.PORT || 4000;
 const UPLOAD_PATH = path.join(__dirname, "../upload");
 // 创建临时文件存放目录
-const tempUploadDir = path.join(__dirname, "../upload-temp/");
+const tempUploadDir = path.join(__dirname, "../upload-temp");
 if (!fs.existsSync(tempUploadDir)) {
   fs.mkdirSync(tempUploadDir);
 }
